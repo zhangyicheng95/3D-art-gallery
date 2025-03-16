@@ -1,0 +1,168 @@
+import * as THREE from 'three';
+
+/**
+ * FPS风格的键盘控制器
+ */
+export default class KeyboardControls {
+  constructor(camera, domElement) {
+    this.camera = camera;
+    this.domElement = domElement;
+    
+    // 移动速度
+    this.moveSpeed = 5.0;
+    // 是否启用
+    this.enabled = false;
+    
+    // 按键状态
+    this.keys = {
+      forward: false,  // W
+      backward: false, // S
+      left: false,     // A
+      right: false,    // D
+      up: false,       // 空格
+      down: false,     // Shift
+    };
+    
+    // 方向向量
+    this.moveDirection = new THREE.Vector3();
+    // 相机向前方向
+    this.cameraDirection = new THREE.Vector3();
+    // 相机右侧方向
+    this.cameraRight = new THREE.Vector3();
+    
+    // 绑定事件处理函数
+    this._onKeyDown = this._onKeyDown.bind(this);
+    this._onKeyUp = this._onKeyUp.bind(this);
+  }
+  
+  // 启用控制器
+  enable() {
+    if (this.enabled) return;
+    this.enabled = true;
+    
+    // 添加事件监听
+    window.addEventListener('keydown', this._onKeyDown);
+    window.addEventListener('keyup', this._onKeyUp);
+  }
+  
+  // 禁用控制器
+  disable() {
+    if (!this.enabled) return;
+    this.enabled = false;
+    
+    // 移除事件监听
+    window.removeEventListener('keydown', this._onKeyDown);
+    window.removeEventListener('keyup', this._onKeyUp);
+    
+    // 重置按键状态
+    Object.keys(this.keys).forEach(key => {
+      this.keys[key] = false;
+    });
+  }
+  
+  // 更新相机位置
+  update(deltaTime) {
+    if (!this.enabled) return;
+    
+    // 每秒移动的距离 = 速度 * 时间增量
+    const actualMoveSpeed = this.moveSpeed * deltaTime;
+    
+    // 获取相机的方向
+    this.camera.getWorldDirection(this.cameraDirection);
+    this.cameraRight.crossVectors(this.camera.up, this.cameraDirection).normalize();
+    
+    // 重置移动方向
+    this.moveDirection.set(0, 0, 0);
+    
+    // 计算移动方向
+    if (this.keys.forward) {
+      this.moveDirection.add(this.cameraDirection);
+    }
+    if (this.keys.backward) {
+      this.moveDirection.sub(this.cameraDirection);
+    }
+    if (this.keys.left) {
+      this.moveDirection.sub(this.cameraRight);
+    }
+    if (this.keys.right) {
+      this.moveDirection.add(this.cameraRight);
+    }
+    if (this.keys.up) {
+      this.moveDirection.y += 1;
+    }
+    if (this.keys.down) {
+      this.moveDirection.y -= 1;
+    }
+    
+    // 标准化移动方向，使得对角线移动速度和直线移动速度相同
+    if (this.moveDirection.length() > 0) {
+      this.moveDirection.normalize();
+      
+      // 应用移动
+      const oldPosition = this.camera.position.clone();
+      this.camera.position.addScaledVector(this.moveDirection, actualMoveSpeed);
+      
+      // 如果相机有look-at目标，需要更新目标点以保持相同的视角
+      if (this.camera.userData.target) {
+        const lookAtTarget = this.camera.userData.target;
+        const movement = new THREE.Vector3().subVectors(this.camera.position, oldPosition);
+        lookAtTarget.add(movement);
+      }
+    }
+  }
+  
+  // 键盘按下事件处理
+  _onKeyDown(event) {
+    switch (event.code) {
+      case 'KeyW':
+        this.keys.forward = true;
+        break;
+      case 'KeyS':
+        this.keys.backward = true;
+        break;
+      case 'KeyA':
+        this.keys.left = true;
+        break;
+      case 'KeyD':
+        this.keys.right = true;
+        break;
+      case 'Space':
+        this.keys.up = true;
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        this.keys.down = true;
+        break;
+    }
+  }
+  
+  // 键盘释放事件处理
+  _onKeyUp(event) {
+    switch (event.code) {
+      case 'KeyW':
+        this.keys.forward = false;
+        break;
+      case 'KeyS':
+        this.keys.backward = false;
+        break;
+      case 'KeyA':
+        this.keys.left = false;
+        break;
+      case 'KeyD':
+        this.keys.right = false;
+        break;
+      case 'Space':
+        this.keys.up = false;
+        break;
+      case 'ShiftLeft':
+      case 'ShiftRight':
+        this.keys.down = false;
+        break;
+    }
+  }
+  
+  // 销毁控制器，移除事件监听
+  dispose() {
+    this.disable();
+  }
+} 
